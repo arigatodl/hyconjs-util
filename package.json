@@ -4,7 +4,8 @@
     "description": "Common javascript functions for Hycon",
     "main": "lib/index.js",
     "scripts": {
-        "build": "tsc --declaration"
+        "build": "tsc --declaration",
+        "lint": "tslint -p tsconfig.json"
     },
     "keywords": [
         "hycon",
