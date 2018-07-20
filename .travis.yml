@@ -8,4 +8,5 @@ cache:
 
 script:
   - npm install
+  - npm run-scrupt lint
   - npm run-script build
