@@ -14,7 +14,6 @@ import { japanese } from "../mnemonic/japanese"
 import { korean } from "../mnemonic/korean"
 import { spanish } from "../mnemonic/spanish"
 import * as proto from "./serialization/proto"
-
 export function blake2bHash(ob: Uint8Array | string): Uint8Array {
     typeof ob === "string" ? ob = Buffer.from(ob) : ob = ob
     return blake2b(32).update(ob).digest()
@@ -81,13 +80,13 @@ export function hycontoString(val: Long): string {
 }
 
 export function hyconfromString(val: string): Long {
-    if (val === "" || val === undefined || val === null) { return Long.fromNumber(0, true) }
+    if (val === "" || val === undefined || val === null) { return Long.UZERO }
     if (val[val.length - 1] === ".") { val += "0" }
     const arr = val.toString().split(".")
-    let hycon = Long.fromString(arr[0], true).multiply(Math.pow(10, 9))
+    let hycon = Long.fromString(arr[0], true).multiply(Math.pow(10, 9)).toUnsigned()
     if (arr.length > 1) {
         arr[1] = arr[1].length > 9 ? arr[1].slice(0, 9) : arr[1]
-        const subCon = Long.fromString(arr[1], true).multiply(Math.pow(10, 9 - arr[1].length))
+        const subCon = Long.fromString(arr[1], true).multiply(Math.pow(10, 9 - arr[1].length)).toUnsigned()
         hycon = hycon.add(subCon)
     }
     return hycon.toUnsigned()
@@ -118,7 +117,7 @@ export function decrypt(password: string, iv: string, data: string): Buffer | bo
     }
 }
 
-export function signTx(fromAddress: string, toAddress: string, amount: string, minerFee: string, nonce: number, privateKey: string): { signature: string, recovery: number, newSignature: string, newRecovery: number } {
+export function signTx(fromAddress: string, toAddress: string, amount: string, minerFee: string, nonce: number, privateKey: string, networkid: string = "hycon"): { signature: string, recovery: number } {
     try {
         const from = addressToUint8Array(fromAddress)
         const to = addressToUint8Array(toAddress)
@@ -127,42 +126,28 @@ export function signTx(fromAddress: string, toAddress: string, amount: string, m
             amount: hyconfromString(amount),
             fee: hyconfromString(minerFee),
             from,
+            networkid,
             nonce,
             to,
         }
 
-        let signature: string = ""
-        let recovery: number = -1
-        let newSignature: string = ""
-        let newRecovery: number = -1
-        const iTxNew = Object.assign({ networkid: "hycon" }, iTx)
-        const protoTxNew = proto.Tx.encode(iTxNew).finish()
-        const txHashNew = blake2bHash(protoTxNew)
-        const newSign = secp256k1.sign(Buffer.from(txHashNew), Buffer.from(privateKey, "hex"))
-        if (Date.now() <= 1544108400000) {
-            const protoTx = proto.Tx.encode(iTx).finish()
-            const txHash = blake2bHash(protoTx)
-            const oldSign = secp256k1.sign(Buffer.from(txHash), Buffer.from(privateKey, "hex"))
+        const protoTx = proto.Tx.encode(iTx).finish()
+        const txHash = blake2bHash(protoTx)
+        const sign = secp256k1.sign(Buffer.from(txHash), Buffer.from(privateKey, "hex"))
 
-            signature = oldSign.signature.toString("hex")
-            recovery = oldSign.recovery
-            newSignature = newSign.signature.toString("hex")
-            newRecovery = newSign.recovery
-        } else {
-            signature = newSign.signature.toString("hex")
-            recovery = newSign.recovery
-        }
+        const signature = sign.signature.toString("hex")
+        const recovery = sign.recovery
 
-        return { signature, recovery, newSignature, newRecovery }
+        return { signature, recovery}
     } catch (error) {
         throw new Error(`Sign is invalid.`)
     }
 }
 
-export function signTxWithHDWallet(toAddress: string, amount: string, minerFee: string, nonce: number, privateExtendedKey: string, index: number): { signature: string, recovery: number, newSignature: string, newRecovery: number } {
+export function signTxWithHDWallet(toAddress: string, amount: string, minerFee: string, nonce: number, privateExtendedKey: string, index: number, networkid: string = "hycon"): { signature: string, recovery: number } {
     try {
         const { address, privateKey } = deriveWallet(privateExtendedKey, index)
-        return this.signTx(address, toAddress, amount, minerFee, nonce, privateKey)
+        return this.signTx(address, toAddress, amount, minerFee, nonce, privateKey, networkid)
     } catch (error) {
         throw new Error(`Failed to signTxWithHDWallet : ${error}`)
     }
